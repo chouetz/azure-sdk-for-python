@@ -26,7 +26,8 @@ from .._models import (
     AddParticipantResult,
     RemoveParticipantResult,
     TransferCallResult,
-    MuteParticipantsResult,
+    MuteParticipantResult,
+    SendDtmfTonesResult,
     CallInvite
 )
 from .._generated.aio import AzureCommunicationCallAutomationService
@@ -59,7 +60,7 @@ if TYPE_CHECKING:
         FileSource,
         TextSource,
         SsmlSource,
-        Choice
+        RecognitionChoice
     )
     from azure.core.credentials_async import (
         AsyncTokenCredential
@@ -423,7 +424,7 @@ class CallConnectionClient:
 
         audience = [] if play_to == "all" else [serialize_identifier(i) for i in play_to]
         play_request = PlayRequest(
-            play_source_info=play_source_single._to_generated(),  # pylint:disable=protected-access
+            play_sources=[play_source_single._to_generated()],  # pylint:disable=protected-access
             play_to=audience,
             play_options=PlayOptions(loop=loop),
             operation_context=operation_context,
@@ -481,10 +482,11 @@ class CallConnectionClient:
         operation_context: Optional[str] = None,
         interrupt_prompt: bool = False,
         dtmf_inter_tone_timeout: Optional[int] = None,
-        dtmf_max_tones_to_collect: Optional[str] = None,
+        dtmf_max_tones_to_collect: Optional[int] = None,
         dtmf_stop_tones: Optional[List[str or 'DtmfTone']] = None,
-        choices: Optional[List["Choice"]] = None,
-        end_silence_timeout_in_ms: Optional[int] = None,
+        speech_language: Optional[str] = None,
+        choices: Optional[List['RecognitionChoice']] = None,
+        end_silence_timeout: Optional[int] = None,
         speech_recognition_model_endpoint_id: Optional[str] = None,
         callback_url: Optional[str] = None,
         **kwargs
@@ -517,9 +519,15 @@ class CallConnectionClient:
         :paramtype dtmf_max_tones_to_collect: int
         :keyword dtmf_stop_tones: List of tones that will stop recognizing.
         :paramtype dtmf_stop_tones: list[str or ~azure.communication.callautomation.DtmfTone]
-        :keyword speech_recognition_model_endpoint_id:
-        Endpoint id where the custom speech recognition model was deployed.
-        :paramtype speech_recognition_model_endpoint_id:
+        :keyword speech_language: Speech language to be recognized, If not set default is en-US.
+        :paramtype speech_language: str
+        :keyword choices: Defines Ivr choices for recognize.
+        :paramtype choices: list[~azure.communication.callautomation.RecognitionChoice]
+        :keyword end_silence_timeout: The length of end silence when user stops speaking and cogservice
+         send response.
+        :paramtype end_silence_timeout: int
+        :keyword speech_recognition_model_endpoint_id: Endpoint where the custom model was deployed.
+        :paramtype speech_recognition_model_endpoint_id: str
         :keyword callback_url: Url that overrides original callback URI for this request.
         :paramtype callback_url: str
         :return: None
@@ -530,6 +538,7 @@ class CallConnectionClient:
             interrupt_prompt=interrupt_prompt,
             initial_silence_timeout_in_seconds=initial_silence_timeout,
             target_participant=serialize_identifier(target_participant),
+            speech_language=speech_language,
             speech_recognition_model_endpoint_id=speech_recognition_model_endpoint_id
         )
         play_source_single: Optional[MediaSources] = None
@@ -540,26 +549,28 @@ class CallConnectionClient:
             play_source_single = play_prompt
 
         if input_type == RecognizeInputType.DTMF:
-            dtmf_options=DtmfOptions(
+            dtmf_options = DtmfOptions(
                 inter_tone_timeout_in_seconds=dtmf_inter_tone_timeout,
                 max_tones_to_collect=dtmf_max_tones_to_collect,
                 stop_tones=dtmf_stop_tones
             )
             options.dtmf_options = dtmf_options
         elif input_type == RecognizeInputType.SPEECH:
-            speech_options = SpeechOptions(end_silence_timeout_in_ms=end_silence_timeout_in_ms)
+            speech_options = SpeechOptions(
+                end_silence_timeout_in_ms=end_silence_timeout * 1000 if end_silence_timeout is not None else None)
             options.speech_options = speech_options
         elif input_type == RecognizeInputType.SPEECH_OR_DTMF:
-            dtmf_options=DtmfOptions(
+            dtmf_options = DtmfOptions(
                 inter_tone_timeout_in_seconds=dtmf_inter_tone_timeout,
                 max_tones_to_collect=dtmf_max_tones_to_collect,
                 stop_tones=dtmf_stop_tones
             )
-            speech_options = SpeechOptions(end_silence_timeout_in_ms=end_silence_timeout_in_ms)
+            speech_options = SpeechOptions(
+                end_silence_timeout_in_ms=end_silence_timeout * 1000 if end_silence_timeout is not None else None)
             options.dtmf_options = dtmf_options
             options.speech_options = speech_options
         elif input_type == RecognizeInputType.CHOICES:
-            options.choices = choices
+            options.choices = [choice._to_generated() for choice in choices] #pylint:disable=protected-access
         else:
             raise ValueError(f"Input type '{input_type}' is not supported.")
 
@@ -648,7 +659,7 @@ class CallConnectionClient:
         )
 
     @distributed_trace_async
-    async def send_dtmf(
+    async def send_dtmf_tones(
         self,
         tones: List[Union[str, 'DtmfTone']],
         target_participant: 'CommunicationIdentifier',
@@ -656,7 +667,7 @@ class CallConnectionClient:
         operation_context: Optional[str] = None,
         callback_url: Optional[str] = None,
         **kwargs
-    ) -> None:
+    ) -> SendDtmfTonesResult:
         """Send Dtmf tones to the call.
 
         :param tones: List of tones to be sent to target participant.
@@ -667,39 +678,41 @@ class CallConnectionClient:
         :paramtype operation_context: str
         :keyword callback_url: Url that overrides original callback URI for this request.
         :paramtype callback_url: str
-        :return: None
-        :rtype: None
+        :return: SendDtmfTonesResult
+        :rtype: ~azure.communication.callautomation.SendDtmfTonesResult
         :raises ~azure.core.exceptions.HttpResponseError:
         """
-        send_dtmf_request = SendDtmfRequest(
+        send_dtmf_tones_request = SendDtmfTonesRequest(
             tones=tones,
             target_participant=serialize_identifier(target_participant),
             operation_context=operation_context,
             callback_uri=callback_url
         )
-        await self._call_media_client.send_dtmf(
+        process_repeatability_first_sent(kwargs)
+        response = await self._call_media_client.send_dtmf_tones(
             self._call_connection_id,
-            send_dtmf_request,
+            send_dtmf_tones_request,
             **kwargs
         )
+        return SendDtmfTonesResult._from_generated(response)  # pylint:disable=protected-access
 
     @distributed_trace_async
-    async def mute_participants(
+    async def mute_participant(
         self,
         target_participant: 'CommunicationIdentifier',
         *,
         operation_context: Optional[str] = None,
         **kwargs
-    ) -> MuteParticipantsResult:
-        """Mute participants from the call using identifier.
+    ) -> MuteParticipantResult:
+        """Mute participant from the call using identifier.
 
         :param target_participant: Participant to be muted from the call. Only ACS Users are supported. Required.
         :type target_participant: ~azure.communication.callautomation.CommunicationIdentifier
         :keyword operation_context: Used by customers when calling mid-call actions to correlate the request to the
          response event.
         :paramtype operation_context: str
-        :return: MuteParticipantsResult
-        :rtype: ~azure.communication.callautomation.MuteParticipantsResult
+        :return: MuteParticipantResult
+        :rtype: ~azure.communication.callautomation.MuteParticipantResult
         :raises ~azure.core.exceptions.HttpResponseError:
         """
         mute_participants_request = MuteParticipantsRequest(
@@ -712,7 +725,7 @@ class CallConnectionClient:
             mute_participants_request,
             **kwargs
         )
-        return MuteParticipantsResult._from_generated(response)  # pylint:disable=protected-access
+        return MuteParticipantResult._from_generated(response) # pylint:disable=protected-access
 
     async def __aenter__(self) -> "CallConnectionClient":
         await self._client.__aenter__()

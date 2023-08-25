@@ -199,7 +199,7 @@ class TestCallConnectionClient(unittest.TestCase):
         response = call_connection.remove_participant(user)
         self.assertEqual(self.operation_context, response.operation_context)
 
-    def test_mute_participants(self):
+    def test_mute_participant(self):
         def mock_send(_, **kwargs):
             kwargs.pop("stream", None)
             if kwargs:
@@ -213,5 +213,5 @@ class TestCallConnectionClient(unittest.TestCase):
             call_connection_id=self.call_connection_id,
             transport=Mock(send=mock_send))
         user = CommunicationUserIdentifier(self.communication_user_id)
-        response = call_connection.mute_participants(user)
+        response = call_connection.mute_participant(user)
         self.assertEqual(self.operation_context, response.operation_context)

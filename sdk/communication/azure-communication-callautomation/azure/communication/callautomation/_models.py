@@ -33,7 +33,7 @@ if TYPE_CHECKING:
         MediaStreamingAudioChannelType,
         CallConnectionState,
         RecordingState,
-        Gender,
+        VoiceKind,
         DtmfTone
     )
     from ._generated.models  import (
@@ -43,7 +43,8 @@ if TYPE_CHECKING:
         RemoveParticipantResponse as RemoveParticipantResultRest,
         TransferCallResponse as TransferParticipantResultRest,
         RecordingStateResponse as RecordingStateResultRest,
-        MuteParticipantsResponse as MuteParticipantsResultRest,
+        MuteParticipantsResult as MuteParticipantsResultRest,
+        SendDtmfTonesResult as SendDtmfTonesResultRest,
     )
 
 
@@ -192,9 +193,9 @@ class FileSource:
 
     def _to_generated(self):
         return PlaySourceInternal(
-            source_type=PlaySourceType.FILE,
-            file_source=FileSourceInternal(uri=self.url),
-            play_source_id=self.play_source_cache_id
+            kind=PlaySourceType.FILE,
+            file=FileSourceInternal(uri=self.url),
+            play_source_cache_id=self.play_source_cache_id
         )
 
 
@@ -206,13 +207,15 @@ class TextSource:
     :keyword source_locale: Source language locale to be played. Refer to available locales here:
         https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/language-support?tabs=stt-tts
     :paramtype source_locale: str
-    :keyword voice_gender: Voice gender type. Known values are: "male" and "female".
-    :paramtype voice_gender: str or 'azure.communication.callautomation.Gender'
+    :keyword voice_kind: Voice kind type. Known values are: "male" and "female".
+    :paramtype voice_kind: str or ~azure.communication.callautomation.VoiceKind
     :keyword voice_name: Voice name to be played. Refer to available Text-to-speech voices here:
         https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/language-support?tabs=stt-tts
     :paramtype voice_name: str
     :keyword play_source_cache_id: Cached source id of the play media, if it exists.
     :paramtype play_source_cache_id: str
+    :keyword custom_voice_endpoint_id: Endpoint where the custom voice was deployed.
+    :paramtype custom_voice_endpoint_id: str
     """
 
     text: str
@@ -220,43 +223,43 @@ class TextSource:
     source_locale: Optional[str]
     """Source language locale to be played. Refer to available locales here:
         https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/language-support?tabs=stt-tts"""
-    voice_gender: Optional[Union[str, 'Gender']]
-    """Voice gender type. Known values are: "male" and "female"."""
+    voice_kind: Optional[Union[str, 'VoiceKind']]
+    """Voice kind type. Known values are: "male" and "female"."""
     voice_name: Optional[str]
     """Voice name to be played. Refer to available Text-to-speech voices here:
         https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/language-support?tabs=stt-tts"""
     play_source_cache_id: Optional[str]
     """Cached source id of the play media, if it exists."""
     custom_voice_endpoint_id: Optional[str]
-    """Endpoint where the custom voice was deployed"""
+    """Endpoint where the custom voice was deployed."""
 
     def __init__(
         self,
         text: str,
         *,
         source_locale: Optional[str] = None,
-        voice_gender: Optional[Union[str, 'Gender']] = None,
+        voice_kind: Optional[Union[str, 'VoiceKind']] = None,
         voice_name: Optional[str] = None,
         play_source_cache_id: Optional[str] = None,
         custom_voice_endpoint_id: Optional[str] = None
     ):
         self.text = text
         self.source_locale = source_locale
-        self.voice_gender = voice_gender
+        self.voice_kind = voice_kind
         self.voice_name = voice_name
         self.play_source_cache_id = play_source_cache_id
         self.custom_voice_endpoint_id = custom_voice_endpoint_id
 
     def _to_generated(self):
         return PlaySourceInternal(
-            source_type=PlaySourceType.TEXT,
-            text_source=TextSourceInternal(
+            kind=PlaySourceType.TEXT,
+            text=TextSourceInternal(
             text=self.text,
             source_locale=self.source_locale,
-            voice_gender=self.voice_gender,
+            voice_kind=self.voice_kind,
             voice_name=self.voice_name,
             custom_voice_endpoint_id=self.custom_voice_endpoint_id),
-            play_source_id=self.play_source_cache_id
+            play_source_cache_id=self.play_source_cache_id
         )
 
 class SsmlSource:
@@ -266,8 +269,8 @@ class SsmlSource:
     :type ssml_text: str
     :keyword play_source_cache_id: Cached source id of the play media, if it exists.
     :paramtype play_source_cache_id: str
-    :ivar custom_voice_endpoint_id: Endpoint id where the custom voice model is deployed.
-    :vartype custom_voice_endpoint_id: str
+    :keyword custom_voice_endpoint_id: Endpoint id where the custom voice model is deployed.
+    :paramtype custom_voice_endpoint_id: str
     """
 
     ssml_text: str
@@ -290,11 +293,11 @@ class SsmlSource:
 
     def _to_generated(self):
         return PlaySourceInternal(
-            source_type=PlaySourceType.SSML,
-            ssml_source=SsmlSourceInternal(
+            kind=PlaySourceType.SSML,
+            ssml=SsmlSourceInternal(
                 ssml_text=self.ssml_text,
                 custom_voice_endpoint_id=self.custom_voice_endpoint_id),
-            play_source_id=self.play_source_cache_id
+            play_source_cache_id=self.play_source_cache_id
         )
 
 class MediaStreamingConfiguration:
@@ -589,8 +592,7 @@ class TransferCallResult:
     def _from_generated(cls, transfer_result_generated: 'TransferParticipantResultRest'):
         return cls(operation_context=transfer_result_generated.operation_context)
 
-
-class Choice:
+class RecognitionChoice:
     """
     An IVR choice for the recognize operation.
 
@@ -625,9 +627,8 @@ class Choice:
     def _to_generated(self):
         return ChoiceInternal(label=self.label, phrases=self.phrases, tone=self.tone)
 
-
-class MuteParticipantsResult:
-    """The response payload for muting participants from the call.
+class MuteParticipantResult:
+    """The result payload for muting participant from the call.
 
     :keyword operation_context: The operation context provided by client.
     :paramtype operation_context: str
@@ -644,5 +645,25 @@ class MuteParticipantsResult:
         self.operation_context = operation_context
 
     @classmethod
-    def _from_generated(cls, mute_participants_result_generated: 'MuteParticipantsResultRest'):
-        return cls(operation_context=mute_participants_result_generated.operation_context)
+    def _from_generated(cls, mute_participant_result_generated: 'MuteParticipantsResultRest'):
+        return cls(operation_context=mute_participant_result_generated.operation_context)
+
+class SendDtmfTonesResult:
+    """The result payload for send Dtmf tones.
+    :keyword operation_context: The operation context provided by client.
+    :paramtype operation_context: str
+    """
+
+    operation_context: Optional[str]
+    """The operation context provided by client."""
+
+    def __init__(
+        self,
+        *,
+        operation_context: Optional[str] = None
+    ) -> None:
+        self.operation_context = operation_context
+
+    @classmethod
+    def _from_generated(cls, send_dtmf_tones_result_generated: 'SendDtmfTonesResultRest'):
+        return cls(operation_context=send_dtmf_tones_result_generated.operation_context)

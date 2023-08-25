@@ -162,7 +162,7 @@ class CallAutomationClient:
         voip_headers: Optional[Dict[str, str]] = None,
         operation_context: Optional[str] = None,
         media_streaming_configuration: Optional['MediaStreamingConfiguration'] = None,
-        azure_cognitive_services_endpoint_url: Optional[str] = None,
+        cognitive_services_endpoint: Optional[str] = None,
         **kwargs
     ) -> CallConnectionProperties:
         """Create a call connection request to a target identity.
@@ -187,9 +187,9 @@ class CallAutomationClient:
         :keyword media_streaming_configuration: Media Streaming Configuration.
         :paramtype media_streaming_configuration: ~azure.communication.callautomation.MediaStreamingConfiguration
          or None
-        :keyword azure_cognitive_services_endpoint_url:
+        :keyword cognitive_services_endpoint:
          The identifier of the Cognitive Service resource assigned to this call.
-        :paramtype azure_cognitive_services_endpoint_url: str or None
+        :paramtype cognitive_services_endpoint: str or None
         :return: CallConnectionProperties
         :rtype: ~azure.communication.callautomation.CallConnectionProperties
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -217,11 +217,11 @@ class CallAutomationClient:
             targets=targets,
             callback_uri=callback_url,
             source_caller_id_number=serialize_phone_identifier(source_caller_id_number),
-            source_display_name=target_participant.source_display_name,
+            source_display_name=source_display_name,
             source_identity=serialize_communication_user_identifier(self.source),
             operation_context=operation_context,
             media_streaming_configuration=media_config,
-            azure_cognitive_services_endpoint_url=azure_cognitive_services_endpoint_url,
+            cognitive_services_endpoint=cognitive_services_endpoint,
             custom_context=user_custom_context
         )
         process_repeatability_first_sent(kwargs)
@@ -242,6 +242,7 @@ class CallAutomationClient:
         operation_context: Optional[str] = None,
         sip_headers: Optional[Dict[str, str]] = None,
         voip_headers: Optional[Dict[str, str]] = None,
+        cognitive_services_endpoint: Optional[str] = None,
         **kwargs
     ) -> CallConnectionProperties:
         """ Create a call connection request to a list of multiple target identities.
@@ -262,6 +263,9 @@ class CallAutomationClient:
         :paramtype sip_headers: Dict[str, str]
         :keyword voip_headers: Voip Headers for Voip Call
         :paramtype voip_headers: Dict[str, str]
+        :keyword cognitive_services_endpoint:
+         The identifier of the Cognitive Service resource assigned to this call.
+        :paramtype cognitive_services_endpoint: str
         :return: CallConnectionProperties
         :rtype: ~azure.communication.callautomation.CallConnectionProperties
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -278,6 +282,7 @@ class CallAutomationClient:
             sip_headers=sip_headers,
             voip_headers=voip_headers,
             operation_context=operation_context,
+            cognitive_services_endpoint=cognitive_services_endpoint,
             **kwargs
         )
 
@@ -288,7 +293,7 @@ class CallAutomationClient:
         callback_url: str,
         *,
         media_streaming_configuration: Optional['MediaStreamingConfiguration'] = None,
-        azure_cognitive_services_endpoint_url: Optional[str] = None,
+        cognitive_services_endpoint: Optional[str] = None,
         operation_context: Optional[str] = None,
         **kwargs
     ) -> CallConnectionProperties:
@@ -301,9 +306,9 @@ class CallAutomationClient:
         :type callback_url: str
         :keyword media_streaming_configuration: Media Streaming Configuration.
         :paramtype media_streaming_configuration: ~azure.communication.callautomation.MediaStreamingConfiguration
-        :keyword azure_cognitive_services_endpoint_url:
+        :keyword cognitive_services_endpoint:
          The endpoint url of the Azure Cognitive Services resource attached.
-        :paramtype azure_cognitive_services_endpoint_url: str
+        :paramtype cognitive_services_endpoint: str
         :keyword operation_context: The operation context.
         :paramtype operation_context: str
         :return: CallConnectionProperties
@@ -315,7 +320,7 @@ class CallAutomationClient:
             callback_uri=callback_url,
             media_streaming_configuration=media_streaming_configuration.to_generated(
             ) if media_streaming_configuration else None,
-            azure_cognitive_services_endpoint_url=azure_cognitive_services_endpoint_url,
+            cognitive_services_endpoint=cognitive_services_endpoint,
             answered_by_identifier=serialize_communication_user_identifier(
                 self.source) if self.source else None,
             operation_context=operation_context
@@ -628,8 +633,8 @@ class CallAutomationClient:
         :keyword length: If provided, only download the bytes of the content in the specified range.
          Length of the bytes to be downloaded.
         :paramtype length: int
-        :return: Iterable[bytes]
-        :rtype: Iterable[bytes]
+        :return: AsyncIterable[bytes]
+        :rtype: AsyncIterable[bytes]
         :raises ~azure.core.exceptions.HttpResponseError:
         """
         stream = await self._downloader.download_streaming(
